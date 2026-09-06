@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
     "build": "npm run build --workspace server && npm run build --workspace client",
-    "start": "node server/dist/index.js",
+    "start": "node server/dist/src/index.js",
     "db:generate": "npm run prisma:generate --workspace server",
     "db:push": "npm run prisma:push --workspace server",
     "db:seed": "npm run prisma:seed --workspace server"
