@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Year {
+  SECOND
+  THIRD
+}
+
+enum ParticipantStatus {
+  NOT_STARTED
+  PLAYING
+  COMPLETED
+  DISQUALIFIED
+}
+
+enum EventStatus {
+  CLOSED
+  OPEN
+  PAUSED
+}
+
+enum ViolationType {
+  TAB_SWITCH
+  WINDOW_BLUR
+  FULLSCREEN_EXIT
+  COPY_ATTEMPT
+  PASTE_ATTEMPT
+  CUT_ATTEMPT
+  DEVTOOLS_ATTEMPT
+  EXTERNAL_NAVIGATION
+  MULTIPLE_SESSION
+}
+
+model Participant {
+  id                  Int @id @default(autoincrement())
+  participantId       String @unique
+  name                String
+  year                Year
+  passwordHash        String
+  enabled             Boolean @default(true)
+  status              ParticipantStatus @default(NOT_STARTED)
+  assignedQuestionId  Int?
+  sessionId           String? @unique
+  startTime           DateTime?
+  completionTime      DateTime?
+  elapsedMs           Int?
+  score               Int @default(0)
+  disqualified        Boolean @default(false)
+  disqualificationReason String? @db.Text
+  question            Question? @relation(fields: [assignedQuestionId], references: [id])
+  attempts            Attempt[]
+  violations          Violation[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  @@index([year, status])
+  @@index([assignedQuestionId])
+  @@index([completionTime, disqualified])
+}
+
+model Admin {
+  id Int @id @default(autoincrement())
+  username String @unique
+  passwordHash String
+  createdAt DateTime @default(now())
+}
+
+model Question {
+  id Int @id @default(autoincrement())
+  codeNumber Int
+  year Year
+  title String
+  language String
+  difficulty String
+  enabled Boolean @default(true)
+  lines QuestionLine[]
+  participants Participant[]
+  attempts Attempt[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([year, codeNumber])
+  @@index([year, enabled])
+}
+
+model QuestionLine {
+  id Int @id @default(autoincrement())
+  questionId Int
+  position Int
+  content String @db.Text
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  @@unique([questionId, position])
+}
+
+model Attempt {
+  id Int @id @default(autoincrement())
+  participantId Int
+  questionId Int
+  shuffleOrder Json
+  submittedOrder Json?
+  isCorrect Boolean @default(false)
+  startTime DateTime?
+  completionTime DateTime?
+  elapsedMs Int?
+  status ParticipantStatus @default(NOT_STARTED)
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id])
+  submissions Submission[]
+  violations Violation[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([participantId])
+  @@index([questionId, status])
+}
+
+model Submission {
+  id Int @id @default(autoincrement())
+  attemptId Int
+  submittedOrder Json
+  isCorrect Boolean
+  submittedAt DateTime @default(now())
+  attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+}
+
+model Violation {
+  id Int @id @default(autoincrement())
+  participantId Int
+  attemptId Int?
+  eventType ViolationType
+  timestamp DateTime @default(now())
+  currentQuestion Int?
+  details String? @db.Text
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  attempt Attempt? @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  @@index([participantId, timestamp])
+  @@index([eventType])
+}
+
+model EventSetting {
+  id Int @id @default(autoincrement())
+  key String @unique
+  value String @db.Text
+  updatedAt DateTime @updatedAt
+}

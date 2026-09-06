@@ -1,0 +1,15 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: code_shuffling
+      MYSQL_USER: code_round
+      MYSQL_PASSWORD: code_round
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - code_round_mysql:/var/lib/mysql
+volumes:
+  code_round_mysql:
