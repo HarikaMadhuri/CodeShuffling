@@ -1,33 +1,1139 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { DndContext, DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { Activity, ArrowRight, Check, ChevronLeft, Clipboard, Code2, Download, GripVertical, LockKeyhole, LogOut, Monitor, Play, RotateCcw, ShieldAlert, Sparkles, Trophy, Users, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  Activity,
+  ArrowRight,
+  Check,
+  ChevronLeft,
+  Clipboard,
+  Code2,
+  Download,
+  GripVertical,
+  LockKeyhole,
+  LogOut,
+  Monitor,
+  Play,
+  RotateCcw,
+  ShieldAlert,
+  Sparkles,
+  Trophy,
+  Users,
+  X,
+} from "lucide-react";
 
-type Participant = { id: string; name: string; year: 'SECOND' | 'THIRD'; status: string; assignedCode: string | null; startTime?: string; completionTime?: string; elapsedMs?: number; score: number; disqualified: boolean; disqualificationReason?: string };
+type Participant = {
+  id: string;
+  name: string;
+  year: "SECOND" | "THIRD";
+  status: string;
+  assignedCode: string | null;
+  startTime?: string;
+  completionTime?: string;
+  elapsedMs?: number;
+  score: number;
+  disqualified: boolean;
+  disqualificationReason?: string;
+};
 type Line = { id: number; content: string };
-const API = import.meta.env.VITE_API_URL ?? (window.location.hostname === 'localhost' ? 'http://localhost:4000/api' : 'https://codeshuffling-production.up.railway.app/api');
-const yearLabel = (year: string) => year === 'SECOND' ? '2nd Year' : '3rd Year';
-const formatTime = (ms = 0) => { const total = Math.max(0, ms); const minutes = Math.floor(total / 60000).toString().padStart(2, '0'); const seconds = Math.floor(total / 1000 % 60).toString().padStart(2, '0'); const millis = (total % 1000).toString().padStart(3, '0'); return `${minutes}:${seconds}.${millis}`; };
-async function api(path: string, options: RequestInit = {}, token?: string) { const response = await fetch(`${API}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers ?? {}) } }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error ?? 'Something went wrong'); return body; }
-function useStoredAuth() { const [auth, setAuth] = useState<{ token: string; role: string } | null>(() => JSON.parse(sessionStorage.getItem('code-round-auth') ?? 'null')); const save = (value: { token: string; role: string } | null) => { setAuth(value); value ? sessionStorage.setItem('code-round-auth', JSON.stringify(value)) : sessionStorage.removeItem('code-round-auth'); }; return { auth, save }; }
+const API =
+  import.meta.env.VITE_API_URL ??
+  (window.location.hostname === "localhost"
+    ? "http://localhost:4000/api"
+    : "https://codeshuffling-production.up.railway.app/api");
+const yearLabel = (year: string) =>
+  year === "SECOND" ? "2nd Year" : "3rd Year";
+const formatTime = (ms = 0) => {
+  const total = Math.max(0, ms);
+  const minutes = Math.floor(total / 60000)
+    .toString()
+    .padStart(2, "0");
+  const seconds = Math.floor((total / 1000) % 60)
+    .toString()
+    .padStart(2, "0");
+  const millis = (total % 1000).toString().padStart(3, "0");
+  return `${minutes}:${seconds}.${millis}`;
+};
+async function api(path: string, options: RequestInit = {}, token?: string) {
+  const response = await fetch(`${API}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers ?? {}),
+    },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error ?? "Something went wrong");
+  return body;
+}
+function useStoredAuth() {
+  const [auth, setAuth] = useState<{ token: string; role: string } | null>(() =>
+    JSON.parse(sessionStorage.getItem("code-round-auth") ?? "null"),
+  );
+  const save = (value: { token: string; role: string } | null) => {
+    setAuth(value);
+    value
+      ? sessionStorage.setItem("code-round-auth", JSON.stringify(value))
+      : sessionStorage.removeItem("code-round-auth");
+  };
+  return { auth, save };
+}
 
-function Brand({ onHome }: { onHome?: () => void }) { return <button className="brand" onClick={onHome}><span className="brand-mark"><Code2 size={18} /></span><span><b>CODE SHUFFLING</b><small>Technical round / 2026</small></span></button>; }
-function Pill({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: string }) { return <span className={`pill ${tone}`}>{children}</span>; }
-function Shell({ children, onHome, right }: { children: React.ReactNode; onHome?: () => void; right?: React.ReactNode }) { return <div className="app-shell"><header className="topbar"><Brand onHome={onHome} /><div className="topbar-right">{right}</div></header>{children}</div>; }
+function Brand({ onHome }: { onHome?: () => void }) {
+  return (
+    <button className="brand" onClick={onHome}>
+      <span className="brand-mark">
+        <Code2 size={18} />
+      </span>
+      <span>
+        <b>CODE SHUFFLING</b>
+        <small>Technical round / 2026</small>
+      </span>
+    </button>
+  );
+}
+function Pill({
+  children,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  tone?: string;
+}) {
+  return <span className={`pill ${tone}`}>{children}</span>;
+}
+function Shell({
+  children,
+  onHome,
+  right,
+}: {
+  children: React.ReactNode;
+  onHome?: () => void;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <Brand onHome={onHome} />
+        <div className="topbar-right">{right}</div>
+      </header>
+      {children}
+    </div>
+  );
+}
 
-function Landing({ onLogin, onAdmin }: { onLogin: (year: 'SECOND' | 'THIRD') => void; onAdmin: () => void }) { return <Shell right={<button className="subtle-button" onClick={onAdmin}><LockKeyhole size={15} /> Admin access</button>}><main className="landing"><div className="landing-copy"><Pill tone="accent"><Sparkles size={13} /> Inter-college technical event</Pill><h1>Think in order.<br /><em>Move with precision.</em></h1><p className="lede">Arrange the shuffled code correctly before the time runs out. One challenge. One attempt. Your fastest valid solve wins.</p><div className="year-grid"><button className="year-card" onClick={() => onLogin('SECOND')}><span className="year-index">01 / FOUNDATION</span><strong>2nd Year</strong><span>Build the sequence <ArrowRight size={16} /></span></button><button className="year-card bright" onClick={() => onLogin('THIRD')}><span className="year-index">02 / ADVANCED</span><strong>3rd Year</strong><span>Prove your fluency <ArrowRight size={16} /></span></button></div><div className="landing-foot"><span><ShieldAlert size={15} /> Fullscreen monitored</span><span><Monitor size={15} /> Server-timed</span><span><Trophy size={15} /> Live rankings</span></div></div><div className="hero-visual"><div className="grid-lines" /><div className="terminal-card"><div className="terminal-head"><span className="traffic"><i /><i /><i /></span><span>round.config.ts</span><span className="terminal-status">LIVE</span></div><pre><code><span className="muted">01</span> <span className="blue">const</span> round = <span className="yellow">await</span> launch({`\n`}<span className="muted">02</span>   category: <span className="green">"your-year"</span>,{`\n`}<span className="muted">03</span>   precision: <span className="purple">true</span>,{`\n`}<span className="muted">04</span>   time: <span className="orange">server.now()</span>{`\n`}<span className="muted">05</span> &#125;);</code></pre><div className="terminal-footer"><span><span className="dot" /> event.open</span><span>08:42.351</span></div></div><div className="score-stamp"><Trophy size={18} /><div><b>FASTEST VALID</b><span>00:42.118</span></div></div></div></main></Shell>; }
+function Landing({
+  onLogin,
+  onAdmin,
+}: {
+  onLogin: (year: "SECOND" | "THIRD") => void;
+  onAdmin: () => void;
+}) {
+  return (
+    <Shell
+      right={
+        <button className="subtle-button" onClick={onAdmin}>
+          <LockKeyhole size={15} /> Admin access
+        </button>
+      }
+    >
+      <main className="landing">
+        <div className="landing-copy">
+          <Pill tone="accent">
+            <Sparkles size={13} /> Inter-college technical event
+          </Pill>
+          <h1>
+            Think in order.
+            <br />
+            <em>Move with precision.</em>
+          </h1>
+          <p className="lede">
+            Arrange the shuffled code correctly before the time runs out. One
+            challenge. One attempt. Your fastest valid solve wins.
+          </p>
+          <div className="year-grid">
+            <button className="year-card" onClick={() => onLogin("SECOND")}>
+              <span className="year-index">01 / FOUNDATION</span>
+              <strong>2nd Year</strong>
+              <span>
+                Build the sequence <ArrowRight size={16} />
+              </span>
+            </button>
+            <button
+              className="year-card bright"
+              onClick={() => onLogin("THIRD")}
+            >
+              <span className="year-index">02 / ADVANCED</span>
+              <strong>3rd Year</strong>
+              <span>
+                Prove your fluency <ArrowRight size={16} />
+              </span>
+            </button>
+          </div>
+          <div className="landing-foot">
+            <span>
+              <ShieldAlert size={15} /> Fullscreen monitored
+            </span>
+            <span>
+              <Monitor size={15} /> Server-timed
+            </span>
+            <span>
+              <Trophy size={15} /> Live rankings
+            </span>
+          </div>
+        </div>
+        <div className="hero-visual">
+          <div className="grid-lines" />
+          <div className="terminal-card">
+            <div className="terminal-head">
+              <span className="traffic">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span>round.config.ts</span>
+              <span className="terminal-status">LIVE</span>
+            </div>
+            <pre>
+              <code>
+                <span className="muted">01</span>{" "}
+                <span className="blue">const</span> round ={" "}
+                <span className="yellow">await</span> launch({`\n`}
+                <span className="muted">02</span> category:{" "}
+                <span className="green">"your-year"</span>,{`\n`}
+                <span className="muted">03</span> precision:{" "}
+                <span className="purple">true</span>,{`\n`}
+                <span className="muted">04</span> time:{" "}
+                <span className="orange">server.now()</span>
+                {`\n`}
+                <span className="muted">05</span> &#125;);
+              </code>
+            </pre>
+            <div className="terminal-footer">
+              <span>
+                <span className="dot" /> event.open
+              </span>
+              <span>08:42.351</span>
+            </div>
+          </div>
+          <div className="score-stamp">
+            <Trophy size={18} />
+            <div>
+              <b>FASTEST VALID</b>
+              <span>00:42.118</span>
+            </div>
+          </div>
+        </div>
+      </main>
+    </Shell>
+  );
+}
 
-function Login({ year, onBack, onSuccess, onAdmin }: { year: 'SECOND' | 'THIRD'; onBack: () => void; onSuccess: (token: string, participant: Participant) => void; onAdmin: () => void }) { const [id, setId] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const submit = async (e: React.FormEvent) => { e.preventDefault(); setBusy(true); setError(''); try { const result = await api('/auth/participant/login', { method: 'POST', body: JSON.stringify({ participantId: id, password, year }) }); onSuccess(result.token, result.participant); } catch (err) { setError((err as Error).message); } finally { setBusy(false); } }; return <Shell right={<><button className="subtle-button" onClick={onBack}><ChevronLeft size={15} /> Choose category</button><button className="subtle-button" onClick={onAdmin}><LockKeyhole size={15} /> Admin</button></>}><main className="auth-page"><div className="auth-aside"><Pill tone="accent">{yearLabel(year)} division</Pill><h1>Enter the<br /><em>starting grid.</em></h1><p>Your assigned code is waiting. Keep your credentials private and use one device for the entire attempt.</p><div className="auth-note"><ShieldAlert size={18} /><span><b>One account. One attempt.</b><br />Duplicate active sessions are blocked automatically.</span></div></div><form className="auth-card" onSubmit={submit}><div className="card-eyebrow">PARTICIPANT LOGIN</div><h2>Welcome back.</h2><p>Use the credentials provided by your event organizer.</p><label>Participant ID / Roll Number<input value={id} onChange={e => setId(e.target.value)} placeholder="e.g. 24A81A0501" autoComplete="username" required /></label><label>Password<input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Enter password" autoComplete="current-password" required /></label>{error && <div className="error-box"><X size={16} />{error}</div>}<button className="primary-button full" disabled={busy}>{busy ? 'AUTHENTICATING...' : 'CONTINUE'} <ArrowRight size={17} /></button><span className="form-foot"><LockKeyhole size={13} /> Secured by event authentication</span></form></main></Shell>; }
+function Login({
+  year,
+  onBack,
+  onSuccess,
+  onAdmin,
+}: {
+  year: "SECOND" | "THIRD";
+  onBack: () => void;
+  onSuccess: (token: string, participant: Participant) => void;
+  onAdmin: () => void;
+}) {
+  const [id, setId] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api("/auth/participant/login", {
+        method: "POST",
+        body: JSON.stringify({ participantId: id, password, year }),
+      });
+      onSuccess(result.token, result.participant);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Shell
+      right={
+        <>
+          <button className="subtle-button" onClick={onBack}>
+            <ChevronLeft size={15} /> Choose category
+          </button>
+          <button className="subtle-button" onClick={onAdmin}>
+            <LockKeyhole size={15} /> Admin
+          </button>
+        </>
+      }
+    >
+      <main className="auth-page">
+        <div className="auth-aside">
+          <Pill tone="accent">{yearLabel(year)} division</Pill>
+          <h1>
+            Enter the
+            <br />
+            <em>starting grid.</em>
+          </h1>
+          <p>
+            Your assigned code is waiting. Keep your credentials private and use
+            one device for the entire attempt.
+          </p>
+          <div className="auth-note">
+            <ShieldAlert size={18} />
+            <span>
+              <b>One account. One attempt.</b>
+              <br />
+              Duplicate active sessions are blocked automatically.
+            </span>
+          </div>
+        </div>
+        <form className="auth-card" onSubmit={submit}>
+          <div className="card-eyebrow">PARTICIPANT LOGIN</div>
+          <h2>Welcome back.</h2>
+          <p>Use the credentials provided by your event organizer.</p>
+          <label>
+            Participant ID / Roll Number
+            <input
+              value={id}
+              onChange={(e) => setId(e.target.value)}
+              placeholder="e.g. 24A81A0501"
+              autoComplete="username"
+              required
+            />
+          </label>
+          <label>
+            Password
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              placeholder="Enter password"
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          {error && (
+            <div className="error-box">
+              <X size={16} />
+              {error}
+            </div>
+          )}
+          <button className="primary-button full" disabled={busy}>
+            {busy ? "AUTHENTICATING..." : "CONTINUE"} <ArrowRight size={17} />
+          </button>
+          <span className="form-foot">
+            <LockKeyhole size={13} /> Secured by event authentication
+          </span>
+        </form>
+      </main>
+    </Shell>
+  );
+}
 
-function Rules({ participant, onStart, onLogout }: { participant: Participant; onStart: () => void; onLogout: () => void }) { const [understood, setUnderstood] = useState(false); return <Shell onHome={onLogout} right={<><Pill>{yearLabel(participant.year)}</Pill><button className="icon-button" onClick={onLogout} title="Sign out"><LogOut size={16} /></button></>}><main className="rules-page"><div className="page-heading"><div><span className="section-kicker">PRE-FLIGHT CHECK</span><h1>Know the rules.<br /><em>Own the attempt.</em></h1></div><div className="identity-chip"><span className="avatar">{participant.name.slice(0, 1)}</span><span><b>{participant.name}</b><small>{participant.id} / {participant.assignedCode}</small></span></div></div><div className="rules-layout"><section className="rules-card"><div className="rules-card-head"><span className="rules-number">01</span><div><h2>Code Shuffling Round Rules</h2><p>Read carefully before starting. Your timer begins only when you enter the challenge.</p></div></div><ol>{['You will receive one coding problem assigned specifically to you.', 'The code has been deliberately shuffled. Arrange every line into the correct order.', 'Your timer starts when you click START ROUND and runs on the server.', 'Do not switch tabs, minimize the browser, or switch to another application.', 'Do not leave fullscreen mode, copy, paste, cut, or open developer tools.', 'Any detected violation immediately terminates the round and records the reason.', 'Only valid completed attempts appear on the final leaderboard.', 'The leaderboard ranks primarily by server-recorded completion time.'].map((rule, i) => <li key={rule}><span>{String(i + 1).padStart(2, '0')}</span>{rule}</li>)}</ol></section><aside className="start-card"><div className="start-icon"><Play size={23} fill="currentColor" /></div><span className="section-kicker">READY WHEN YOU ARE</span><h2>One code.<br />One shot.</h2><label className="check-row"><input type="checkbox" checked={understood} onChange={e => setUnderstood(e.target.checked)} /><span className="fake-check"><Check size={13} /></span><span>I understand the rules and accept the monitoring policy.</span></label><button className="primary-button full" disabled={!understood} onClick={onStart}>START ROUND <ArrowRight size={17} /></button><small className="center-note"><Monitor size={13} /> Fullscreen will be requested next</small></aside></div></main></Shell>; }
+function Rules({
+  participant,
+  onStart,
+  onLogout,
+}: {
+  participant: Participant;
+  onStart: () => void;
+  onLogout: () => void;
+}) {
+  const [understood, setUnderstood] = useState(false);
+  return (
+    <Shell
+      onHome={onLogout}
+      right={
+        <>
+          <Pill>{yearLabel(participant.year)}</Pill>
+          <button className="icon-button" onClick={onLogout} title="Sign out">
+            <LogOut size={16} />
+          </button>
+        </>
+      }
+    >
+      <main className="rules-page">
+        <div className="page-heading">
+          <div>
+            <span className="section-kicker">PRE-FLIGHT CHECK</span>
+            <h1>
+              Know the rules.
+              <br />
+              <em>Own the attempt.</em>
+            </h1>
+          </div>
+          <div className="identity-chip">
+            <span className="avatar">{participant.name.slice(0, 1)}</span>
+            <span>
+              <b>{participant.name}</b>
+              <small>
+                {participant.id} / {participant.assignedCode}
+              </small>
+            </span>
+          </div>
+        </div>
+        <div className="rules-layout">
+          <section className="rules-card">
+            <div className="rules-card-head">
+              <span className="rules-number">01</span>
+              <div>
+                <h2>Code Shuffling Round Rules</h2>
+                <p>
+                  Read carefully before starting. Your timer begins only when
+                  you enter the challenge.
+                </p>
+              </div>
+            </div>
+            <ol>
+              {[
+                "You will receive one coding problem assigned specifically to you.",
+                "The code has been deliberately shuffled. Arrange every line into the correct order.",
+                "Your timer starts when you click START ROUND and runs on the server.",
+                "Do not switch tabs, minimize the browser, or switch to another application.",
+                "Do not leave fullscreen mode, copy, paste, cut, or open developer tools.",
+                "Any detected violation immediately terminates the round and records the reason.",
+                "Only valid completed attempts appear on the final leaderboard.",
+                "The leaderboard ranks primarily by server-recorded completion time.",
+              ].map((rule, i) => (
+                <li key={rule}>
+                  <span>{String(i + 1).padStart(2, "0")}</span>
+                  {rule}
+                </li>
+              ))}
+            </ol>
+          </section>
+          <aside className="start-card">
+            <div className="start-icon">
+              <Play size={23} fill="currentColor" />
+            </div>
+            <span className="section-kicker">READY WHEN YOU ARE</span>
+            <h2>
+              One code.
+              <br />
+              One shot.
+            </h2>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={understood}
+                onChange={(e) => setUnderstood(e.target.checked)}
+              />
+              <span className="fake-check">
+                <Check size={13} />
+              </span>
+              <span>
+                I understand the rules and accept the monitoring policy.
+              </span>
+            </label>
+            <button
+              className="primary-button full"
+              disabled={!understood}
+              onClick={onStart}
+            >
+              START ROUND <ArrowRight size={17} />
+            </button>
+            <small className="center-note">
+              <Monitor size={13} /> Fullscreen will be requested next
+            </small>
+          </aside>
+        </div>
+      </main>
+    </Shell>
+  );
+}
 
-function SortableLine({ line, index }: { line: Line; index: number }) { const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: line.id }); return <div ref={setNodeRef} className={`code-line ${isDragging ? 'dragging' : ''}`} style={{ transform: CSS.Transform.toString(transform), transition }} {...attributes}><span className="line-number">{String(index + 1).padStart(2, '0')}</span><code>{line.content || ' '}</code><button className="drag-handle" {...listeners} aria-label="Drag code line"><GripVertical size={17} /></button></div>; }
+function SortableLine({ line, index }: { line: Line; index: number }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: line.id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`code-line ${isDragging ? "dragging" : ""}`}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      {...attributes}
+    >
+      <span className="line-number">{String(index + 1).padStart(2, "0")}</span>
+      <code>{line.content || " "}</code>
+      <button
+        className="drag-handle"
+        {...listeners}
+        aria-label="Drag code line"
+      >
+        <GripVertical size={17} />
+      </button>
+    </div>
+  );
+}
 
-function Game({ token, participant, onDone, onLogout }: { token: string; participant: Participant; onDone: () => void; onLogout: () => void }) { const [lines, setLines] = useState<Line[]>([]); const [startTime, setStartTime] = useState<string>(); const [elapsed, setElapsed] = useState(0); const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false); const [disqualified, setDisqualified] = useState(''); const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } })); const reported = useRef(false); const violate = async (eventType: string, details: string) => { if (reported.current || disqualified) return; reported.current = true; try { await api('/participant/violation', { method: 'POST', body: JSON.stringify({ eventType, details }) }, token); } finally { setDisqualified(details); } }; useEffect(() => { api('/participant/me', {}, token).then(result => { if (result.participant.status !== 'PLAYING') return onDone(); setLines(result.attempt.lines); setStartTime(result.attempt.startTime); }).catch(() => onLogout()); }, [token]); useEffect(() => { const tick = () => startTime && setElapsed(Date.now() - new Date(startTime).getTime()); const interval = window.setInterval(tick, 50); const onVisibility = () => document.visibilityState !== 'visible' && void violate('TAB_SWITCH', 'Browser tab switching detected.'); const onBlur = () => void violate('WINDOW_BLUR', 'Browser window focus lost.'); const onFullscreen = () => document.fullscreenElement === null && void violate('FULLSCREEN_EXIT', 'Fullscreen mode exited.'); const block = (e: Event) => { e.preventDefault(); void violate(e.type === 'copy' ? 'COPY_ATTEMPT' : e.type === 'paste' ? 'PASTE_ATTEMPT' : 'CUT_ATTEMPT', `${e.type} action blocked.`); }; const key = (e: KeyboardEvent) => { if (e.key === 'F12' || (e.ctrlKey && ['c', 'v', 'x', 'u'].includes(e.key.toLowerCase())) || (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(e.key.toLowerCase()))) { e.preventDefault(); void violate('DEVTOOLS_ATTEMPT', 'Restricted keyboard shortcut detected.'); } }; document.addEventListener('visibilitychange', onVisibility); window.addEventListener('blur', onBlur); document.addEventListener('fullscreenchange', onFullscreen); document.addEventListener('copy', block); document.addEventListener('paste', block); document.addEventListener('cut', block); document.addEventListener('keydown', key); const unload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; }; window.addEventListener('beforeunload', unload); return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onBlur); document.removeEventListener('fullscreenchange', onFullscreen); document.removeEventListener('copy', block); document.removeEventListener('paste', block); document.removeEventListener('cut', block); document.removeEventListener('keydown', key); window.removeEventListener('beforeunload', unload); }; }, [startTime, disqualified]); const onDragEnd = ({ active, over }: DragEndEvent) => { if (over && active.id !== over.id) setLines(value => { const oldIndex = value.findIndex(item => item.id === active.id); const newIndex = value.findIndex(item => item.id === over.id); return arrayMove(value, oldIndex, newIndex); }); }; const check = async () => { setBusy(true); setMessage(''); try { const result = await api('/participant/submit', { method: 'POST', body: JSON.stringify({ order: lines.map(line => line.id) }) }, token); if (result.correct) onDone(); else setMessage(result.message); } catch (err) { setMessage((err as Error).message); } finally { setBusy(false); } }; const enterFullscreen = () => document.documentElement.requestFullscreen?.().catch(() => undefined); if (disqualified) return <Result title="DISQUALIFIED" subtitle={disqualified} danger onExit={onLogout} />; return <div className="game-shell"><header className="game-topbar"><Brand onHome={onLogout} /><div className="game-context"><span>{participant.id}</span><span>{participant.assignedCode}</span><div className="timer"><span>TIME</span>{formatTime(elapsed)}</div></div></header><main className="game-main"><div className="game-title"><div><span className="section-kicker">{yearLabel(participant.year)} / {participant.assignedCode}</span><h1>Arrange the sequence.</h1><p>Drag each line into the original order. The code text is locked; only its position can change.</p></div><button className="subtle-button fullscreen-button" onClick={enterFullscreen}><Monitor size={15} /> Fullscreen</button></div><div className="game-grid"><section className="editor-panel"><div className="editor-head"><span><span className="live-dot" /> SHUFFLED CODE</span><span>{lines.length} lines / drag to reorder</span></div><DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}><SortableContext items={lines.map(line => line.id)} strategy={verticalListSortingStrategy}><div className="code-list">{lines.map((line, index) => <SortableLine key={line.id} line={line} index={index} />)}</div></SortableContext></DndContext><div className="editor-actions"><button className="reset-button" onClick={() => api('/participant/me', {}, token).then(result => setLines(result.attempt.lines))}><RotateCcw size={15} /> Reset order</button><button className="primary-button" disabled={busy} onClick={check}>{busy ? 'CHECKING...' : 'CHECK CODE'} <Check size={16} /></button></div>{message && <div className="try-again"><X size={16} /><span>{message}</span></div>}</section><aside className="game-aside"><div className="side-stat"><span className="section-kicker">CURRENT RUN</span><strong>{formatTime(elapsed)}</strong><small>Server-synced display</small></div><div className="side-rule"><ShieldAlert size={17} /><div><b>Stay in the round</b><span>Tab switches, window changes, fullscreen exits and clipboard actions are logged.</span></div></div><button className="danger-link" onClick={onLogout}><LogOut size={14} /> Exit attempt</button></aside></div></main></div>; }
+function Game({
+  token,
+  participant,
+  onDone,
+  onLogout,
+}: {
+  token: string;
+  participant: Participant;
+  onDone: () => void;
+  onLogout: () => void;
+}) {
+  const [lines, setLines] = useState<Line[]>([]);
+  const [startTime, setStartTime] = useState<string>();
+  const [elapsed, setElapsed] = useState(0);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [disqualified, setDisqualified] = useState("");
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
+  const reported = useRef(false);
+  const violate = async (eventType: string, details: string) => {
+    if (reported.current || disqualified) return;
+    reported.current = true;
+    try {
+      await api(
+        "/participant/violation",
+        { method: "POST", body: JSON.stringify({ eventType, details }) },
+        token,
+      );
+    } finally {
+      setDisqualified(details);
+    }
+  };
+  useEffect(() => {
+    api("/participant/me", {}, token)
+      .then((result) => {
+        if (result.participant.status !== "PLAYING") return onDone();
+        setLines(result.attempt.lines);
+        setStartTime(result.attempt.startTime);
+      })
+      .catch(() => onLogout());
+  }, [token]);
+  useEffect(() => {
+    const tick = () =>
+      startTime && setElapsed(Date.now() - new Date(startTime).getTime());
+    const interval = window.setInterval(tick, 50);
+    const onVisibility = () =>
+      document.visibilityState !== "visible" &&
+      void violate("TAB_SWITCH", "Browser tab switching detected.");
+    const onBlur = () =>
+      void violate("WINDOW_BLUR", "Browser window focus lost.");
+    const onFullscreen = () =>
+      document.fullscreenElement === null &&
+      void violate("FULLSCREEN_EXIT", "Fullscreen mode exited.");
+    const block = (e: Event) => {
+      e.preventDefault();
+      void violate(
+        e.type === "copy"
+          ? "COPY_ATTEMPT"
+          : e.type === "paste"
+            ? "PASTE_ATTEMPT"
+            : "CUT_ATTEMPT",
+        `${e.type} action blocked.`,
+      );
+    };
+    const key = (e: KeyboardEvent) => {
+      if (
+        e.key === "F12" ||
+        (e.ctrlKey && ["c", "v", "x", "u"].includes(e.key.toLowerCase())) ||
+        (e.ctrlKey &&
+          e.shiftKey &&
+          ["i", "j", "c"].includes(e.key.toLowerCase()))
+      ) {
+        e.preventDefault();
+        void violate(
+          "DEVTOOLS_ATTEMPT",
+          "Restricted keyboard shortcut detected.",
+        );
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("blur", onBlur);
+    document.addEventListener("fullscreenchange", onFullscreen);
+    document.addEventListener("copy", block);
+    document.addEventListener("paste", block);
+    document.addEventListener("cut", block);
+    document.addEventListener("keydown", key);
+    const unload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", unload);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("blur", onBlur);
+      document.removeEventListener("fullscreenchange", onFullscreen);
+      document.removeEventListener("copy", block);
+      document.removeEventListener("paste", block);
+      document.removeEventListener("cut", block);
+      document.removeEventListener("keydown", key);
+      window.removeEventListener("beforeunload", unload);
+    };
+  }, [startTime, disqualified]);
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (over && active.id !== over.id)
+      setLines((value) => {
+        const oldIndex = value.findIndex((item) => item.id === active.id);
+        const newIndex = value.findIndex((item) => item.id === over.id);
+        return arrayMove(value, oldIndex, newIndex);
+      });
+  };
+  const check = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api(
+        "/participant/submit",
+        {
+          method: "POST",
+          body: JSON.stringify({ order: lines.map((line) => line.id) }),
+        },
+        token,
+      );
+      if (result.correct) onDone();
+      else setMessage(result.message);
+    } catch (err) {
+      setMessage((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const enterFullscreen = () =>
+    document.documentElement.requestFullscreen?.().catch(() => undefined);
+  if (disqualified)
+    return (
+      <Result
+        title="DISQUALIFIED"
+        subtitle={disqualified}
+        danger
+        onExit={onLogout}
+      />
+    );
+  return (
+    <div className="game-shell">
+      <header className="game-topbar">
+        <Brand onHome={onLogout} />
+        <div className="game-context">
+          <span>{participant.id}</span>
+          <span>{participant.assignedCode}</span>
+          <div className="timer">
+            <span>TIME</span>
+            {formatTime(elapsed)}
+          </div>
+        </div>
+      </header>
+      <main className="game-main">
+        <div className="game-title">
+          <div>
+            <span className="section-kicker">
+              {yearLabel(participant.year)} / {participant.assignedCode}
+            </span>
+            <h1>Arrange the sequence.</h1>
+            <p>
+              Drag each line into the original order. The code text is locked;
+              only its position can change.
+            </p>
+          </div>
+          <button
+            className="subtle-button fullscreen-button"
+            onClick={enterFullscreen}
+          >
+            <Monitor size={15} /> Fullscreen
+          </button>
+        </div>
+        <div className="game-grid">
+          <section className="editor-panel">
+            <div className="editor-head">
+              <span>
+                <span className="live-dot" /> SHUFFLED CODE
+              </span>
+              <span>{lines.length} lines / drag to reorder</span>
+            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={onDragEnd}
+            >
+              <SortableContext
+                items={lines.map((line) => line.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="code-list">
+                  {lines.map((line, index) => (
+                    <SortableLine key={line.id} line={line} index={index} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+            <div className="editor-actions">
+              <button
+                className="reset-button"
+                onClick={() =>
+                  api("/participant/me", {}, token).then((result) =>
+                    setLines(result.attempt.lines),
+                  )
+                }
+              >
+                <RotateCcw size={15} /> Reset order
+              </button>
+              <button
+                className="primary-button"
+                disabled={busy}
+                onClick={check}
+              >
+                {busy ? "CHECKING..." : "CHECK CODE"} <Check size={16} />
+              </button>
+            </div>
+            {message && (
+              <div className="try-again">
+                <X size={16} />
+                <span>{message}</span>
+              </div>
+            )}
+          </section>
+          <aside className="game-aside">
+            <div className="side-stat">
+              <span className="section-kicker">CURRENT RUN</span>
+              <strong>{formatTime(elapsed)}</strong>
+              <small>Server-synced display</small>
+            </div>
+            <div className="side-rule">
+              <ShieldAlert size={17} />
+              <div>
+                <b>Stay in the round</b>
+                <span>
+                  Tab switches, window changes, fullscreen exits and clipboard
+                  actions are logged.
+                </span>
+              </div>
+            </div>
+            <button className="danger-link" onClick={onLogout}>
+              <LogOut size={14} /> Exit attempt
+            </button>
+          </aside>
+        </div>
+      </main>
+    </div>
+  );
+}
 
-function Result({ title, subtitle, danger, onExit }: { title: string; subtitle: string; danger?: boolean; onExit: () => void }) { return <div className="result-page"><div className={`result-mark ${danger ? 'danger' : ''}`}>{danger ? <X size={30} /> : <Check size={30} />}</div><span className="section-kicker">{danger ? 'ATTEMPT TERMINATED' : 'VALID SUBMISSION'}</span><h1>{title}</h1><p>{subtitle}</p><button className="primary-button" onClick={onExit}>RETURN TO HOME <ArrowRight size={17} /></button></div>; }
+function Result({
+  title,
+  subtitle,
+  danger,
+  onExit,
+}: {
+  title: string;
+  subtitle: string;
+  danger?: boolean;
+  onExit: () => void;
+}) {
+  return (
+    <div className="result-page">
+      <div className={`result-mark ${danger ? "danger" : ""}`}>
+        {danger ? <X size={30} /> : <Check size={30} />}
+      </div>
+      <span className="section-kicker">
+        {danger ? "ATTEMPT TERMINATED" : "VALID SUBMISSION"}
+      </span>
+      <h1>{title}</h1>
+      <p>{subtitle}</p>
+      <button className="primary-button" onClick={onExit}>
+        RETURN TO HOME <ArrowRight size={17} />
+      </button>
+    </div>
+  );
+}
 
-function Admin({ onBack }: { onBack: () => void }) { const [token, setToken] = useState(''); const [logged, setLogged] = useState(false); const [username, setUsername] = useState('admin'); const [password, setPassword] = useState('admin123'); const [error, setError] = useState(''); const [data, setData] = useState<any>(); const [filter, setFilter] = useState('ALL'); const load = (t = token) => api('/admin/overview', {}, t).then(setData).catch(err => setError(err.message)); const login = async (e: React.FormEvent) => { e.preventDefault(); try { const result = await api('/auth/admin/login', { method: 'POST', body: JSON.stringify({ username, password }) }); setToken(result.token); setLogged(true); load(result.token); } catch (err) { setError((err as Error).message); } }; if (!logged) return <Shell right={<button className="subtle-button" onClick={onBack}><ChevronLeft size={15} /> Participant entry</button>}><main className="auth-page admin-login"><div className="auth-aside"><Pill tone="orange"><LockKeyhole size={13} /> Restricted area</Pill><h1>Command the<br /><em>round.</em></h1><p>Monitor live activity, manage the question bank, control event access and export the final results.</p></div><form className="auth-card" onSubmit={login}><div className="card-eyebrow">ORGANIZER LOGIN</div><h2>Admin console.</h2><label>Username<input value={username} onChange={e => setUsername(e.target.value)} required /></label><label>Password<input value={password} onChange={e => setPassword(e.target.value)} type="password" required /></label>{error && <div className="error-box"><X size={16} />{error}</div>}<button className="primary-button full">OPEN CONSOLE <ArrowRight size={17} /></button></form></main></Shell>; const counts = data?.counts ?? {}; const rows = data?.participants?.filter((p: Participant) => filter === 'ALL' || p.year === filter) ?? []; const setEvent = async (status: string) => { await api('/admin/event', { method: 'POST', body: JSON.stringify({ status }) }, token); load(); }; return <Shell onHome={onBack} right={<><Pill tone="orange"><span className="live-dot" /> Admin live</Pill><button className="icon-button" onClick={onBack}><LogOut size={16} /></button></>}><main className="admin-page"><div className="admin-heading"><div><span className="section-kicker">ORGANIZER CONSOLE</span><h1>Round control room.</h1><p>Everything important, at a glance.</p></div><div className="event-controls"><span>EVENT STATUS</span><button className={`event-state ${data?.eventStatus === 'OPEN' ? 'open' : ''}`} onClick={() => setEvent('OPEN')}><span className="live-dot" /> OPEN ROUND</button><button className="event-state" onClick={() => setEvent('PAUSED')}>PAUSE NEW</button><button className="event-state" onClick={() => setEvent('CLOSED')}>CLOSE</button></div></div><div className="metric-grid"><div className="metric"><Users size={17} /><span>Total participants</span><strong>{Object.values(counts).reduce((a: number, b: any) => a + b, 0)}</strong><small>across both divisions</small></div><div className="metric"><Activity size={17} /><span>Currently playing</span><strong>{counts.PLAYING ?? 0}</strong><small className="green-text">live right now</small></div><div className="metric"><Trophy size={17} /><span>Completed</span><strong>{counts.COMPLETED ?? 0}</strong><small>valid attempts</small></div><div className="metric alert"><ShieldAlert size={17} /><span>Disqualified</span><strong>{counts.DISQUALIFIED ?? 0}</strong><small>review violations</small></div></div><section className="monitor-panel"><div className="panel-heading"><div><span className="section-kicker">LIVE MONITORING</span><h2>Participant activity</h2></div><div className="panel-tools"><div className="segmented">{[['ALL', 'All'], ['SECOND', '2nd Year'], ['THIRD', '3rd Year']].map(([value, label]) => <button key={value} className={filter === value ? 'selected' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div><button className="icon-button" title="Refresh" onClick={() => load()}><RotateCcw size={15} /></button><a className="icon-button" title="Export CSV" href={`${API}/admin/export`}><Download size={15} /></a></div></div><div className="table-wrap"><table><thead><tr><th>Participant</th><th>Year</th><th>Assigned code</th><th>Status</th><th>Time</th><th>Violations</th></tr></thead><tbody>{rows.map((row: any) => <tr key={row.id}><td><b>{row.participantId}</b><small>{row.name}</small></td><td>{yearLabel(row.year)}</td><td>{row.assignedCode ?? 'Unassigned'}</td><td><Pill tone={row.status === 'COMPLETED' ? 'success' : row.status === 'PLAYING' ? 'active' : row.status === 'DISQUALIFIED' ? 'danger' : 'neutral'}>{row.status.replace('_', ' ')}</Pill></td><td className="mono">{row.elapsedMs ? formatTime(row.elapsedMs) : row.status === 'PLAYING' ? 'Running' : '--'}</td><td>{row.violations > 0 ? <span className="violation-count"><ShieldAlert size={13} /> {row.violations}</span> : '--'}</td></tr>)}</tbody></table></div></section></main></Shell>; }
+function Admin({ onBack }: { onBack: () => void }) {
+  const [token, setToken] = useState("");
+  const [logged, setLogged] = useState(false);
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("admin123");
+  const [error, setError] = useState("");
+  const [data, setData] = useState<any>();
+  const [filter, setFilter] = useState("ALL");
+  const load = (t = token) =>
+    api("/admin/overview", {}, t)
+      .then(setData)
+      .catch((err) => setError(err.message));
+  const login = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const result = await api("/auth/admin/login", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      });
+      setToken(result.token);
+      setLogged(true);
+      load(result.token);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+  if (!logged)
+    return (
+      <Shell
+        right={
+          <button className="subtle-button" onClick={onBack}>
+            <ChevronLeft size={15} /> Participant entry
+          </button>
+        }
+      >
+        <main className="auth-page admin-login">
+          <div className="auth-aside">
+            <Pill tone="orange">
+              <LockKeyhole size={13} /> Restricted area
+            </Pill>
+            <h1>
+              Command the
+              <br />
+              <em>round.</em>
+            </h1>
+            <p>
+              Monitor live activity, manage the question bank, control event
+              access and export the final results.
+            </p>
+          </div>
+          <form className="auth-card" onSubmit={login}>
+            <div className="card-eyebrow">ORGANIZER LOGIN</div>
+            <h2>Admin console.</h2>
+            <label>
+              Username
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              Password
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                required
+              />
+            </label>
+            {error && (
+              <div className="error-box">
+                <X size={16} />
+                {error}
+              </div>
+            )}
+            <button className="primary-button full">
+              OPEN CONSOLE <ArrowRight size={17} />
+            </button>
+          </form>
+        </main>
+      </Shell>
+    );
+  const counts = data?.counts ?? {};
+  const rows =
+    data?.participants?.filter(
+      (p: Participant) => filter === "ALL" || p.year === filter,
+    ) ?? [];
+  const setEvent = async (status: string) => {
+    await api(
+      "/admin/event",
+      { method: "POST", body: JSON.stringify({ status }) },
+      token,
+    );
+    load();
+  };
+  return (
+    <Shell
+      onHome={onBack}
+      right={
+        <>
+          <Pill tone="orange">
+            <span className="live-dot" /> Admin live
+          </Pill>
+          <button className="icon-button" onClick={onBack}>
+            <LogOut size={16} />
+          </button>
+        </>
+      }
+    >
+      <main className="admin-page">
+        <div className="admin-heading">
+          <div>
+            <span className="section-kicker">ORGANIZER CONSOLE</span>
+            <h1>Round control room.</h1>
+            <p>Everything important, at a glance.</p>
+          </div>
+          <div className="event-controls">
+            <span>EVENT STATUS</span>
+            <button
+              className={`event-state ${data?.eventStatus === "OPEN" ? "open" : ""}`}
+              onClick={() => setEvent("OPEN")}
+            >
+              <span className="live-dot" /> OPEN ROUND
+            </button>
+            <button className="event-state" onClick={() => setEvent("PAUSED")}>
+              PAUSE NEW
+            </button>
+            <button className="event-state" onClick={() => setEvent("CLOSED")}>
+              CLOSE
+            </button>
+          </div>
+        </div>
+        <div className="metric-grid">
+          <div className="metric">
+            <Users size={17} />
+            <span>Total participants</span>
+            <strong>
+              {Object.values(counts).reduce((a: number, b: any) => a + b, 0)}
+            </strong>
+            <small>across both divisions</small>
+          </div>
+          <div className="metric">
+            <Activity size={17} />
+            <span>Currently playing</span>
+            <strong>{counts.PLAYING ?? 0}</strong>
+            <small className="green-text">live right now</small>
+          </div>
+          <div className="metric">
+            <Trophy size={17} />
+            <span>Completed</span>
+            <strong>{counts.COMPLETED ?? 0}</strong>
+            <small>valid attempts</small>
+          </div>
+          <div className="metric alert">
+            <ShieldAlert size={17} />
+            <span>Disqualified</span>
+            <strong>{counts.DISQUALIFIED ?? 0}</strong>
+            <small>review violations</small>
+          </div>
+        </div>
+        <section className="monitor-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="section-kicker">LIVE MONITORING</span>
+              <h2>Participant activity</h2>
+            </div>
+            <div className="panel-tools">
+              <div className="segmented">
+                {[
+                  ["ALL", "All"],
+                  ["SECOND", "2nd Year"],
+                  ["THIRD", "3rd Year"],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    className={filter === value ? "selected" : ""}
+                    onClick={() => setFilter(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="icon-button"
+                title="Refresh"
+                onClick={() => load()}
+              >
+                <RotateCcw size={15} />
+              </button>
+              <a
+                className="icon-button"
+                title="Export CSV"
+                href={`${API}/admin/export`}
+              >
+                <Download size={15} />
+              </a>
+            </div>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Participant</th>
+                  <th>Year</th>
+                  <th>Assigned code</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                  <th>Violations</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row: any) => (
+                  <tr key={row.id}>
+                    <td>
+                      <b>{row.participantId}</b>
+                      <small>{row.name}</small>
+                    </td>
+                    <td>{yearLabel(row.year)}</td>
+                    <td>{row.assignedCode ?? "Unassigned"}</td>
+                    <td>
+                      <Pill
+                        tone={
+                          row.status === "COMPLETED"
+                            ? "success"
+                            : row.status === "PLAYING"
+                              ? "active"
+                              : row.status === "DISQUALIFIED"
+                                ? "danger"
+                                : "neutral"
+                        }
+                      >
+                        {row.status.replace("_", " ")}
+                      </Pill>
+                    </td>
+                    <td className="mono">
+                      {row.elapsedMs
+                        ? formatTime(row.elapsedMs)
+                        : row.status === "PLAYING"
+                          ? "Running"
+                          : "--"}
+                    </td>
+                    <td>
+                      {row.violations > 0 ? (
+                        <span className="violation-count">
+                          <ShieldAlert size={13} /> {row.violations}
+                        </span>
+                      ) : (
+                        "--"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </Shell>
+  );
+}
 
-export default function App() { const { auth, save } = useStoredAuth(); const [view, setView] = useState<'landing' | 'login' | 'rules' | 'game' | 'result' | 'admin'>('landing'); const [year, setYear] = useState<'SECOND' | 'THIRD'>('SECOND'); const [participant, setParticipant] = useState<Participant | null>(null); useEffect(() => { if (auth?.role === 'admin') setView('admin'); else if (auth?.role === 'participant') api('/participant/me', {}, auth.token).then(result => { setParticipant(result.participant); setView(result.participant.status === 'PLAYING' ? 'game' : result.participant.status === 'COMPLETED' ? 'result' : 'rules'); }).catch(() => save(null)); }, []); const logout = () => { save(null); setParticipant(null); setView('landing'); }; if (view === 'admin') return <Admin onBack={() => { save(null); setView('landing'); }} />; if (view === 'login') return <Login year={year} onBack={() => setView('landing')} onAdmin={() => setView('admin')} onSuccess={(token, p) => { save({ token, role: 'participant' }); setParticipant(p); setView('rules'); }} />; if (!participant || view === 'landing') return <Landing onLogin={value => { setYear(value); setView('login'); }} onAdmin={() => setView('admin')} />; if (view === 'rules') return <Rules participant={participant} onLogout={logout} onStart={async () => { try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); const result = await api('/participant/start', { method: 'POST' }, auth!.token); setParticipant(result.participant); setView('game'); } catch (err) { alert((err as Error).message); } }} />; if (view === 'game') return <Game token={auth!.token} participant={participant} onLogout={logout} onDone={() => setView('result')} />; return <Result title="ROUND COMPLETED!" subtitle="Your valid completion has been recorded on the server. The final leaderboard will be revealed by the organizers." onExit={logout} />; }
+export default function App() {
+  const { auth, save } = useStoredAuth();
+  const [view, setView] = useState<
+    "landing" | "login" | "rules" | "game" | "result" | "admin"
+  >("landing");
+  const [year, setYear] = useState<"SECOND" | "THIRD">("SECOND");
+  const [participant, setParticipant] = useState<Participant | null>(null);
+  useEffect(() => {
+    if (auth?.role === "admin") setView("admin");
+    else if (auth?.role === "participant")
+      api("/participant/me", {}, auth.token)
+        .then((result) => {
+          setParticipant(result.participant);
+          setView(
+            result.participant.status === "PLAYING"
+              ? "game"
+              : result.participant.status === "COMPLETED"
+                ? "result"
+                : "rules",
+          );
+        })
+        .catch(() => save(null));
+  }, []);
+  const logout = () => {
+    save(null);
+    setParticipant(null);
+    setView("landing");
+  };
+  if (view === "admin")
+    return (
+      <Admin
+        onBack={() => {
+          save(null);
+          setView("landing");
+        }}
+      />
+    );
+  if (view === "login")
+    return (
+      <Login
+        year={year}
+        onBack={() => setView("landing")}
+        onAdmin={() => setView("admin")}
+        onSuccess={(token, p) => {
+          save({ token, role: "participant" });
+          setParticipant(p);
+          setView("rules");
+        }}
+      />
+    );
+  if (!participant || view === "landing")
+    return (
+      <Landing
+        onLogin={(value) => {
+          setYear(value);
+          setView("login");
+        }}
+        onAdmin={() => setView("admin")}
+      />
+    );
+  if (view === "rules")
+    return (
+      <Rules
+        participant={participant}
+        onLogout={logout}
+        onStart={async () => {
+          try {
+            if (document.documentElement.requestFullscreen) {
+              try {
+                await document.documentElement.requestFullscreen();
+              } catch {
+                // Some browsers reject fullscreen; the server still controls the round.
+              }
+            }
+            const result = await api(
+              "/participant/start",
+              { method: "POST" },
+              auth!.token,
+            );
+            setParticipant(result.participant);
+            setView("game");
+          } catch (err) {
+            alert((err as Error).message);
+          }
+        }}
+      />
+    );
+  if (view === "game")
+    return (
+      <Game
+        token={auth!.token}
+        participant={participant}
+        onLogout={logout}
+        onDone={() => setView("result")}
+      />
+    );
+  return (
+    <Result
+      title="ROUND COMPLETED!"
+      subtitle="Your valid completion has been recorded on the server. The final leaderboard will be revealed by the organizers."
+      onExit={logout}
+    />
+  );
+}
