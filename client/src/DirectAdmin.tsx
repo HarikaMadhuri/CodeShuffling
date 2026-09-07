@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const API = import.meta.env.VITE_API_URL ?? (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://code-shuffling-server.vercel.app/api");
+const API = import.meta.env.VITE_API_URL ?? (window.location.hostname === "localhost" ? "http://localhost:4000/api" : "https://codeshuffling-production.up.railway.app/api");
 
 export default function DirectAdmin() {
   const [token, setToken] = useState("");

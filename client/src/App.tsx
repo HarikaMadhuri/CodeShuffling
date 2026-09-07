@@ -6,7 +6,7 @@ import { Activity, ArrowRight, Check, ChevronLeft, Clipboard, Code2, Download, G
 
 type Participant = { id: string; name: string; year: 'SECOND' | 'THIRD'; status: string; assignedCode: string | null; startTime?: string; completionTime?: string; elapsedMs?: number; score: number; disqualified: boolean; disqualificationReason?: string };
 type Line = { id: number; content: string };
-const API = import.meta.env.VITE_API_URL ?? (window.location.hostname === 'localhost' ? 'http://localhost:4000/api' : 'https://code-shuffling-server.vercel.app/api');
+const API = import.meta.env.VITE_API_URL ?? (window.location.hostname === 'localhost' ? 'http://localhost:4000/api' : 'https://codeshuffling-production.up.railway.app/api');
 const yearLabel = (year: string) => year === 'SECOND' ? '2nd Year' : '3rd Year';
 const formatTime = (ms = 0) => { const total = Math.max(0, ms); const minutes = Math.floor(total / 60000).toString().padStart(2, '0'); const seconds = Math.floor(total / 1000 % 60).toString().padStart(2, '0'); const millis = (total % 1000).toString().padStart(3, '0'); return `${minutes}:${seconds}.${millis}`; };
 async function api(path: string, options: RequestInit = {}, token?: string) { const response = await fetch(`${API}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers ?? {}) } }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error ?? 'Something went wrong'); return body; }
